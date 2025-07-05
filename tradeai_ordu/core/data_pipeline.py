@@ -8,7 +8,7 @@ from data.sources import (
     fetch_binance_klines, fetch_binance_orderbook, fetch_binance_funding, fetch_binance_oi,
     fetch_whale_alerts, fetch_news_sentiment, fetch_social_sentiment, fetch_onchain_activity
 )
-from binance_ws_client import BinanceWebSocketClient
+from core.binance_ws_client import BinanceWebSocketClient
 
 class DataPipeline:
     def __init__(self, symbols, interval="15m"):
@@ -17,8 +17,14 @@ class DataPipeline:
         self.semaphore = asyncio.Semaphore(Config.DATA_PARALLEL_LIMIT or 10)
         self.ws_clients = {s: BinanceWebSocketClient(s, interval) for s in symbols}
 
-    async def start_websockets(self):
-        await asyncio.gather(*(client.connect() for client in self.ws_clients.values()))
+    async def start_websockets(self, delay=1.5):
+        """
+        Websocket bağlantılarını aralıklı açar, Binance rate limitini aşmaz.
+        """
+        for symbol, client in self.ws_clients.items():
+            await client.connect()
+            print(f"[WebSocket] {symbol} bağlantısı kuruldu.")
+            await asyncio.sleep(delay)
 
     async def stop_websockets(self):
         await asyncio.gather(*(client.close() for client in self.ws_clients.values()))
